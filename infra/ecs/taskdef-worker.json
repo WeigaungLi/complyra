@@ -1,0 +1,42 @@
+{
+  "family": "complyra-worker",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "1024",
+  "memory": "2048",
+  "executionRoleArn": "<ECS_TASK_EXECUTION_ROLE_ARN>",
+  "taskRoleArn": "<ECS_TASK_ROLE_ARN>",
+  "containerDefinitions": [
+    {
+      "name": "complyra-worker",
+      "image": "<ECR_REGISTRY>/complyra-api:<TAG>",
+      "essential": true,
+      "command": [
+        "rq",
+        "worker",
+        "ingest",
+        "--url",
+        "<REDIS_URL>"
+      ],
+      "environment": [
+        { "name": "APP_ENV", "value": "prod" },
+        { "name": "APP_DATABASE_URL", "value": "<DATABASE_URL>" },
+        { "name": "APP_REDIS_URL", "value": "<REDIS_URL>" },
+        { "name": "APP_QDRANT_URL", "value": "<QDRANT_URL>" },
+        { "name": "APP_OLLAMA_BASE_URL", "value": "<OLLAMA_BASE_URL>" },
+        { "name": "APP_COOKIE_SECURE", "value": "true" }
+      ],
+      "secrets": [
+        { "name": "APP_JWT_SECRET_KEY", "valueFrom": "<JWT_SECRET_ARN>" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/complyra-worker",
+          "awslogs-region": "ap-southeast-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}

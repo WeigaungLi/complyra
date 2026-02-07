@@ -1,0 +1,109 @@
+import json
+
+from pydantic import field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    app_name: str = "Complyra"
+    env: str = "dev"
+    api_prefix: str = "/api"
+    log_level: str = "INFO"
+    log_format: str = "json"
+
+    jwt_secret_key: str = "change-me"
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 60
+
+    demo_username: str = "demo"
+    demo_password_hash: str = ""
+    demo_password: str = ""
+
+    cors_origins: list[str] = ["http://localhost:5173"]
+    trusted_hosts: list[str] = ["localhost", "127.0.0.1"]
+
+    qdrant_url: str = "http://localhost:6333"
+    qdrant_collection: str = "complyra_private_kb"
+
+    embedding_model: str = "BAAI/bge-small-en-v1.5"
+
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_model: str = "qwen2.5:3b-instruct"
+    ollama_prepull: bool = True
+    ollama_timeout_seconds: int = 60
+
+    chunk_size: int = 800
+    chunk_overlap: int = 120
+    top_k: int = 4
+
+    default_tenant_id: str = "default"
+
+    require_approval: bool = True
+    output_policy_enabled: bool = True
+    output_policy_block_message: str = (
+        "The generated response was withheld due to policy checks. "
+        "Please contact an administrator."
+    )
+    output_policy_block_patterns: list[str] = [
+        r"AKIA[0-9A-Z]{16}",
+        r"ASIA[0-9A-Z]{16}",
+        r"(?:sk|rk)-[A-Za-z0-9]{20,}",
+        r"-----BEGIN (?:RSA|OPENSSH|EC|DSA|PRIVATE) KEY-----",
+        r"(?<![A-Za-z0-9_])(password|passwd|pwd)\s*[:=]\s*\S+",
+    ]
+
+    sentry_dsn: str = ""
+    sentry_environment: str = "dev"
+    metrics_enabled: bool = True
+    metrics_path: str = "/metrics"
+    metrics_token: str = ""
+
+    database_url: str = "sqlite:///./data/app.db"
+
+    session_cookie_name: str = "complyra_token"
+    cookie_secure: bool = False
+    cookie_samesite: str = "lax"
+    cookie_domain: str = ""
+
+    redis_url: str = "redis://localhost:6379/0"
+    ingest_queue_name: str = "ingest"
+    ingest_async_enabled: bool = True
+    ingest_max_file_size_mb: int = 20
+    ingest_storage_path: str = "./data/uploads"
+    ingest_allowed_extensions: list[str] = ["pdf", "txt", "md"]
+
+    model_config = SettingsConfigDict(
+        env_prefix="APP_",
+        env_file=".env",
+        case_sensitive=False,
+    )
+
+    @field_validator("cors_origins", "trusted_hosts", "ingest_allowed_extensions", mode="before")
+    @classmethod
+    def _parse_comma_separated_values(cls, value):
+        if isinstance(value, str):
+            items = [item.strip() for item in value.split(",")]
+            return [item for item in items if item]
+        return value
+
+    @field_validator("output_policy_block_patterns", mode="before")
+    @classmethod
+    def _parse_output_policy_patterns(cls, value):
+        if isinstance(value, str):
+            raw = value.strip()
+            if not raw:
+                return []
+            if raw.startswith("["):
+                try:
+                    parsed = json.loads(raw)
+                    if isinstance(parsed, list):
+                        return [str(item).strip() for item in parsed if str(item).strip()]
+                except json.JSONDecodeError:
+                    pass
+            if "||" in raw:
+                return [item.strip() for item in raw.split("||") if item.strip()]
+            return [raw]
+        return value
+
+
+settings = Settings()

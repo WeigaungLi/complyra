@@ -1,0 +1,55 @@
+{
+  "family": "complyra-api",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "1024",
+  "memory": "2048",
+  "executionRoleArn": "<ECS_TASK_EXECUTION_ROLE_ARN>",
+  "taskRoleArn": "<ECS_TASK_ROLE_ARN>",
+  "containerDefinitions": [
+    {
+      "name": "complyra-api",
+      "image": "<ECR_REGISTRY>/complyra-api:<TAG>",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 8000,
+          "hostPort": 8000,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        { "name": "APP_ENV", "value": "prod" },
+        { "name": "APP_DATABASE_URL", "value": "<DATABASE_URL>" },
+        { "name": "APP_REDIS_URL", "value": "<REDIS_URL>" },
+        { "name": "APP_QDRANT_URL", "value": "<QDRANT_URL>" },
+        { "name": "APP_OLLAMA_BASE_URL", "value": "<OLLAMA_BASE_URL>" },
+        { "name": "APP_TRUSTED_HOSTS", "value": "api.example.com,app.example.com" },
+        { "name": "APP_CORS_ORIGINS", "value": "https://app.example.com" },
+        { "name": "APP_COOKIE_SECURE", "value": "true" }
+      ],
+      "secrets": [
+        { "name": "APP_JWT_SECRET_KEY", "valueFrom": "<JWT_SECRET_ARN>" },
+        { "name": "APP_SENTRY_DSN", "valueFrom": "<SENTRY_DSN_ARN>" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/complyra-api",
+          "awslogs-region": "ap-southeast-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health/live').read()\" || exit 1"
+        ],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 30
+      }
+    }
+  ]
+}

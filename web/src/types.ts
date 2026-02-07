@@ -1,0 +1,77 @@
+export type TokenResponse = {
+  access_token: string;
+  token_type: string;
+  role: string;
+  user_id: string;
+  default_tenant_id?: string | null;
+};
+
+export type IngestSubmitResponse = {
+  job_id: string;
+  status: string;
+};
+
+export type IngestJobResponse = {
+  job_id: string;
+  tenant_id: string;
+  filename: string;
+  status: string;
+  chunks_indexed: number;
+  document_id?: string | null;
+  error_message?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RetrievedChunk = {
+  text: string;
+  score: number;
+  source?: string | null;
+};
+
+export type ChatResponse = {
+  status: "pending_approval" | "completed";
+  answer: string;
+  retrieved: RetrievedChunk[];
+  approval_id?: string | null;
+};
+
+export type AuditRecord = {
+  id: number;
+  timestamp: string;
+  tenant_id: string;
+  user: string;
+  action: string;
+  input_text: string;
+  output_text: string;
+  metadata: string;
+};
+
+export type ApprovalResponse = {
+  approval_id: string;
+  user_id: string;
+  tenant_id: string;
+  status: string;
+  question: string;
+  draft_answer: string;
+  final_answer?: string | null;
+  created_at: string;
+  decided_at?: string | null;
+  decision_by?: string | null;
+  decision_note?: string | null;
+};
+
+export type Tenant = {
+  tenant_id: string;
+  name: string;
+  created_at: string;
+};
+
+export type UserAccount = {
+  user_id: string;
+  username: string;
+  role: string;
+  default_tenant_id?: string | null;
+  tenant_ids: string[];
+  created_at: string;
+};

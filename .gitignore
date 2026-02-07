@@ -1,0 +1,38 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Node
+web/node_modules/
+web/dist/
+
+# Local env and secrets
+.env
+.env.local
+.env.*.local
+.env.prod
+
+# Runtime and artifacts
+data/
+releases/
+*.log
+
+# Terraform
+infra/terraform/.terraform/
+infra/terraform/.terraform.lock.hcl
+infra/terraform/terraform.tfstate
+infra/terraform/terraform.tfstate.*
+infra/terraform/*.tfplan
+infra/terraform/login_chat_approval.zip
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/
