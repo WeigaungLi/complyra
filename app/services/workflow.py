@@ -61,11 +61,26 @@ def rewrite_node(state: WorkflowState) -> WorkflowState:
     if not settings.query_rewrite_enabled:
         return {"rewritten_query": question}
 
+    # Async/sync bridging pattern:
+    # LangGraph nodes in this workflow are synchronous functions, but
+    # rewrite_query is an async (coroutine) function. We need to bridge
+    # between the two worlds — call an async function from sync code.
+    #
+    # The challenge: when running inside FastAPI, there is already an
+    # active event loop on the current thread. Python does not allow
+    # calling asyncio.run() or loop.run_until_complete() when a loop is
+    # already running — it raises a RuntimeError.
+    #
+    # Solution: we detect if a loop is already running and, if so, spin
+    # up a brand-new thread via ThreadPoolExecutor. That new thread has
+    # no event loop, so asyncio.run() works there. We then block the
+    # current thread waiting for the result (.result()).
     try:
         loop = asyncio.get_event_loop()
         if loop.is_running():
-            # We're inside an already-running event loop (e.g. FastAPI).
-            # Use a new thread to run the coroutine.
+            # When FastAPI's event loop is already running, we cannot use
+            # asyncio.run() directly on this thread. Instead, we run it
+            # in a separate thread that has its own fresh event loop.
             import concurrent.futures
             with concurrent.futures.ThreadPoolExecutor() as pool:
                 rewritten = pool.submit(
@@ -74,6 +89,8 @@ def rewrite_node(state: WorkflowState) -> WorkflowState:
         else:
             rewritten = loop.run_until_complete(rewrite_query(question))
     except RuntimeError:
+        # Fallback: if get_event_loop() itself raises (no current loop),
+        # asyncio.run() will create a new loop automatically.
         rewritten = asyncio.run(rewrite_query(question))
 
     logger.info("Query rewritten: '%s' -> '%s'", question, rewritten)
@@ -93,8 +110,15 @@ def retrieve_node(state: WorkflowState) -> WorkflowState:
     tenant_id = state["tenant_id"]
 
     if attempts > 0 and sub_questions:
-        # Retry: search with each sub-question
+        # Retry: the relevance judge decided the first retrieval was not
+        # sufficient and generated sub-questions to find more context.
+        # We search for each sub-question individually.
         new_matches = []
+        # Deduplication: build a set of texts we have already retrieved so
+        # we do not include the same chunk twice. Duplicate chunks would
+        # waste context window space and confuse the LLM during answer
+        # generation. We use the raw text as the dedup key because the
+        # same chunk may have different scores across different queries.
         seen_texts = {text for text, *_ in all_contexts}
         for sq in sub_questions:
             sq_matches = search_chunks(sq, settings.top_k, tenant_id)
@@ -110,7 +134,9 @@ def retrieve_node(state: WorkflowState) -> WorkflowState:
         matches = search_chunks(query, settings.top_k, tenant_id)
         all_contexts = list(matches)
 
-    # Extract unique document IDs from retrieved chunks
+    # Extract unique document IDs from retrieved chunks.
+    # These IDs are used later to determine if the answer requires human
+    # approval (some documents may be flagged as requiring approval).
     doc_ids = list({m[4] for m in matches if len(m) > 4 and m[4]})
 
     return {
@@ -135,6 +161,8 @@ def judge_node(state: WorkflowState) -> WorkflowState:
     contexts = [text for text, *_ in state.get("retrieved", [])]
     question = state["question"]
 
+    # Same async/sync bridging pattern as rewrite_node (see comments there).
+    # judge_relevance is async, but this LangGraph node is sync.
     try:
         loop = asyncio.get_event_loop()
         if loop.is_running():
@@ -214,6 +242,13 @@ def route_after_draft(state: WorkflowState) -> str:
 
 
 # ── Build the LangGraph state graph ──────────────────────────────────────────
+# The graph is defined and compiled once at module level (when this file is
+# first imported). This is intentional:
+# 1. Thread-safe: the compiled graph is immutable and safe to use from
+#    multiple threads/requests concurrently.
+# 2. Performance: avoids rebuilding the graph on every request. Graph
+#    compilation involves analyzing the topology, which is wasted work
+#    if the graph structure never changes.
 builder = StateGraph(WorkflowState)
 
 # Register nodes
@@ -241,7 +276,8 @@ builder.add_conditional_edges(
 builder.add_edge("approval", END)
 builder.add_edge("final", END)
 
-# Compile once — the compiled graph is thread-safe and reusable
+# Compile once — the compiled graph object is thread-safe and reusable.
+# Every incoming request calls workflow_graph.invoke() on this same object.
 workflow_graph = builder.compile()
 
 

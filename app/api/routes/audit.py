@@ -1,3 +1,16 @@
+"""Audit log viewing and CSV export for compliance.
+
+Audit logs record every significant action in the system — who did what,
+when, and for which tenant. They are critical for compliance because
+regulations (SOC 2, ISO 27001, etc.) require organizations to maintain
+an immutable record of all access and changes to sensitive data.
+
+This module provides endpoints to:
+  - List recent audit log entries
+  - Search/filter audit logs by user, action, and time range
+  - Export audit logs as a CSV file for offline review or compliance audits
+"""
+
 from __future__ import annotations
 
 import csv
@@ -15,6 +28,7 @@ router = APIRouter(prefix="/audit", tags=["audit"])
 
 
 def _to_record(row) -> AuditRecord:
+    """Convert a database audit row into an API response object."""
     return AuditRecord(
         id=row.id,
         timestamp=row.timestamp,
@@ -28,6 +42,15 @@ def _to_record(row) -> AuditRecord:
 
 
 def _safe_csv_value(value: str) -> str:
+    """Sanitize a string value before writing it into a CSV cell.
+
+    CSV injection prevention: If a cell value starts with =, +, -, or @,
+    spreadsheet programs like Excel or Google Sheets will interpret it as
+    a formula. An attacker could craft audit log data (e.g., a username)
+    like "=CMD('malicious command')" which would execute when someone
+    opens the exported CSV in a spreadsheet. By prepending a single quote,
+    we force the spreadsheet to treat the cell as plain text.
+    """
     if value and value[0] in {"=", "+", "-", "@"}:
         return f"'{value}"
     return value
@@ -39,6 +62,11 @@ def list_audit_logs(
     tenant_ids: list[str] = Depends(get_accessible_tenant_ids),
     _current_user: dict = Depends(require_roles(["admin", "auditor"])),
 ):
+    """List the most recent audit log entries.
+
+    Returns audit records for all tenants the current user can access,
+    ordered by most recent first. Only admins and auditors can view logs.
+    """
     rows = get_logs(tenant_ids=tenant_ids, limit=limit)
     return [_to_record(row) for row in rows]
 
@@ -53,6 +81,13 @@ def search_audit(
     tenant_ids: list[str] = Depends(get_accessible_tenant_ids),
     _current_user: dict = Depends(require_roles(["admin", "auditor"])),
 ):
+    """Search audit logs with filters for user, action, and time range.
+
+    This is the advanced search endpoint. You can filter by:
+      - user: who performed the action
+      - action: what type of action (e.g., "login", "ingest_submitted")
+      - start_time / end_time: ISO 8601 timestamps to limit the date range
+    """
     try:
         start_dt = parser.isoparse(start_time) if start_time else None
         end_dt = parser.isoparse(end_time) if end_time else None
@@ -80,6 +115,13 @@ def export_audit(
     tenant_ids: list[str] = Depends(get_accessible_tenant_ids),
     _current_user: dict = Depends(require_roles(["admin", "auditor"])),
 ):
+    """Export audit logs as a downloadable CSV file.
+
+    This is used during compliance audits when an auditor needs to review
+    logs offline or attach them to a compliance report. The CSV file
+    includes all the same fields as the JSON endpoints. Cell values are
+    sanitized to prevent CSV injection attacks (see _safe_csv_value).
+    """
     try:
         start_dt = parser.isoparse(start_time) if start_time else None
         end_dt = parser.isoparse(end_time) if end_time else None

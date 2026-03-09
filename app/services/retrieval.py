@@ -3,6 +3,26 @@
 Provides collection management, document upsert, and tenant-scoped
 similarity search against a Qdrant instance. Supports hybrid search
 (dense + BM25 sparse vectors with RRF fusion) when enabled.
+
+Key concepts for readers unfamiliar with vector search:
+
+- **Dense vectors** capture the semantic meaning of text. Two sentences
+  that mean the same thing (even with different words) will have similar
+  dense vectors. These are produced by an embedding model (e.g. OpenAI,
+  Cohere, or a local model).
+
+- **Sparse vectors** work like traditional keyword matching (BM25). They
+  are good at finding exact terms but do not understand synonyms or meaning.
+
+- **Hybrid search** combines both approaches: dense vectors find
+  semantically similar results, while sparse vectors boost results that
+  share exact keywords with the query. The two result lists are merged
+  using Reciprocal Rank Fusion (RRF), which balances their rankings into
+  a single, higher-quality result list.
+
+- **Tenant filtering** ensures that each organization (tenant) can only
+  search their own documents. Every vector point is tagged with a
+  tenant_id, and every query filters on it.
 """
 
 import logging
@@ -23,6 +43,12 @@ from app.services.embeddings import embed_texts, get_embedder
 
 @lru_cache(maxsize=1)
 def get_qdrant_client() -> QdrantClient:
+    """Return a singleton Qdrant client connection.
+
+    The @lru_cache decorator ensures we create only one client instance
+    and reuse it across the entire application, avoiding the overhead of
+    opening a new connection on every request.
+    """
     return QdrantClient(url=settings.qdrant_url)
 
 
@@ -69,6 +95,11 @@ def ensure_collection() -> None:
             existing_dim = vectors.get("dense", qmodels.VectorParams(size=0, distance=qmodels.Distance.COSINE)).size
         else:
             existing_dim = vectors.size
+        # Dimension mismatch warning: if the collection was created with a
+        # different embedding model (e.g. 1536-dim OpenAI) than the one
+        # currently configured (e.g. 1024-dim Cohere), all searches will
+        # fail or return garbage. We log a warning so the operator knows
+        # they need to recreate the collection with the new dimensions.
         if existing_dim != dim:
             logger.warning(
                 "Qdrant collection '%s' has dimension %d but current embedding provider "
@@ -118,10 +149,16 @@ def upsert_chunks(
     """
     ensure_collection()
     client = get_qdrant_client()
+    # Convert each text chunk into a dense vector (list of floats) using the
+    # configured embedding model. These vectors capture the semantic meaning
+    # of the text — similar texts produce similar vectors.
     dense_vectors = embed_texts(chunks)
+    # Generate a unique ID for this document. All chunks from the same file
+    # share this ID so we can later list or delete them as a group.
     document_id = str(uuid.uuid4())
 
-    # Determine if we should store sparse vectors
+    # Determine if we should also store sparse (keyword-based) vectors.
+    # Sparse vectors enable hybrid search (combining meaning + keywords).
     use_sparse = settings.hybrid_search_enabled and _collection_has_sparse_vectors()
     sparse_vectors = None
     if use_sparse:
@@ -133,6 +170,9 @@ def upsert_chunks(
 
     points = []
     for idx, (text, dense_vec) in enumerate(zip(chunks, dense_vectors)):
+        # Each point's payload stores the original text and metadata.
+        # The tenant_id is critical for multi-tenant isolation: it ensures
+        # that searches only return results belonging to the same tenant.
         payload = {
             "text": text,
             "source": source,
@@ -168,9 +208,16 @@ def upsert_chunks(
 
 
 def list_documents(tenant_id: str) -> List[dict]:
-    """List all documents for a tenant by aggregating chunks from Qdrant."""
+    """List all documents for a tenant by aggregating chunks from Qdrant.
+
+    Since Qdrant stores individual chunks (not whole documents), we scroll
+    through all points matching the tenant, group them by document_id, and
+    count how many chunks each document has.
+    """
     ensure_collection()
     client = get_qdrant_client()
+    # Filter by tenant_id to enforce multi-tenant data isolation.
+    # Only chunks belonging to this specific tenant will be returned.
     tenant_filter = qmodels.Filter(
         must=[
             qmodels.FieldCondition(
@@ -182,6 +229,8 @@ def list_documents(tenant_id: str) -> List[dict]:
 
     documents: dict[str, dict] = {}
     offset = None
+    # Paginate through all matching points (100 at a time) because there
+    # may be more points than a single scroll call returns.
     while True:
         results, next_offset = client.scroll(
             collection_name=settings.qdrant_collection,
@@ -210,7 +259,11 @@ def list_documents(tenant_id: str) -> List[dict]:
 
 
 def delete_document(document_id: str, tenant_id: str) -> int:
-    """Delete all chunks for a document within a tenant. Returns deleted count."""
+    """Delete all chunks for a document within a tenant. Returns deleted count.
+
+    The filter requires BOTH document_id AND tenant_id to match. This prevents
+    a malicious user in one tenant from deleting another tenant's documents.
+    """
     ensure_collection()
     client = get_qdrant_client()
     doc_filter = qmodels.Filter(
@@ -259,7 +312,11 @@ def search_chunks(query: str, top_k: int, tenant_id: str) -> List[Tuple[str, flo
     search_start = time.perf_counter()
     ensure_collection()
     client = get_qdrant_client()
+    # Embed the query text into a dense vector so we can compare it against
+    # the stored document vectors using cosine similarity.
     dense_vector = embed_texts([query])[0]
+    # Every search is scoped to the requesting tenant. This filter ensures
+    # that results only come from documents belonging to this tenant.
     tenant_filter = qmodels.Filter(
         must=[
             qmodels.FieldCondition(
@@ -272,9 +329,19 @@ def search_chunks(query: str, top_k: int, tenant_id: str) -> List[Tuple[str, flo
     use_hybrid = settings.hybrid_search_enabled and _collection_has_sparse_vectors()
 
     if use_hybrid:
+        # Hybrid search: combine dense vectors (semantic meaning) with sparse
+        # vectors (keyword matching) for better results. Dense search finds
+        # documents with similar meaning even if they use different words;
+        # sparse search finds documents that share exact keywords with the query.
         from app.services.sparse_embed import compute_sparse_vectors
         sparse_vector = compute_sparse_vectors([query])[0]
 
+        # Qdrant's "prefetch" mechanism runs both searches independently,
+        # each fetching top_k * 2 candidates. Then RRF (Reciprocal Rank
+        # Fusion) merges the two ranked lists into one. RRF works by
+        # assigning each result a score of 1/(rank + k) from each list
+        # and summing the scores — results that rank highly in BOTH lists
+        # get the highest combined score.
         results = client.query_points(
             collection_name=settings.qdrant_collection,
             prefetch=[

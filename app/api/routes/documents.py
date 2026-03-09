@@ -1,3 +1,11 @@
+"""Document management endpoints — list, view, update, delete, and preview documents.
+
+Documents are files that have been ingested (uploaded and processed) into the
+system. Each document belongs to a tenant and has metadata like sensitivity
+level, approval override settings, and chunk count. This module provides
+CRUD operations for managing these documents after ingestion.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -30,6 +38,7 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 
 
 def _doc_to_response(doc) -> DocumentDetailResponse:
+    """Convert a database document row into an API response object."""
     return DocumentDetailResponse(
         document_id=doc.document_id,
         tenant_id=doc.tenant_id,
@@ -98,9 +107,16 @@ def update_document(
     user: dict = Depends(require_roles(["admin"])),
 ) -> DocumentDetailResponse:
     """Update document sensitivity or approval override."""
-    # Distinguish "field not sent" vs "field sent as null":
-    # Pydantic sets fields not in the JSON body to their defaults;
-    # model_fields_set tracks which fields were actually in the payload.
+    # --- Why we use model_fields_set ---
+    # In a PATCH request, the client might send {"sensitivity": "restricted"}
+    # without including "approval_override" at all. But Pydantic will set
+    # approval_override to its default value (None) even if the client never
+    # sent it. We need to tell the difference between:
+    #   1. Client sent {"approval_override": null}  -> clear the override
+    #   2. Client did NOT send "approval_override"   -> leave it unchanged
+    # Pydantic's model_fields_set tells us which fields were actually present
+    # in the incoming JSON. If a field is NOT in this set, it was never sent
+    # by the client and we should not modify it in the database.
     if "approval_override" in payload.model_fields_set:
         override_val = payload.approval_override  # could be None (clear) or a string
     else:

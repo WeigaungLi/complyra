@@ -4,6 +4,17 @@ Handles text extraction (PDF, plain text, images), chunking with overlap,
 filename sanitization, and vector upsert into Qdrant.
 Supports OCR fallback via pytesseract for scanned PDF pages and
 multimodal image description via Gemini Vision.
+
+How it works at a high level:
+1. A file (PDF, text, or image) comes in as raw bytes.
+2. We extract readable text from the file. For PDFs, we try the built-in
+   text layer first; if that yields very little text (likely a scanned
+   document), we fall back to OCR (optical character recognition).
+3. The extracted text is split into smaller pieces called "chunks" so that
+   each chunk fits within the embedding model's context window and
+   produces a focused vector representation.
+4. Each chunk is converted into a numeric vector (embedding) and stored
+   in the Qdrant vector database for later similarity search.
 """
 
 from __future__ import annotations
@@ -20,6 +31,9 @@ from app.services.retrieval import upsert_chunks
 
 logger = logging.getLogger(__name__)
 
+# This pattern matches any character that is NOT a letter, digit, dot, underscore,
+# or hyphen. We use it later to replace "unsafe" characters in filenames with
+# underscores, preventing directory-traversal attacks and filesystem issues.
 FILENAME_SANITIZE_PATTERN = re.compile(r"[^A-Za-z0-9._-]+")
 
 
@@ -39,12 +53,22 @@ class ChunkWithMetadata:
 
 
 def _ocr_page(page) -> str:
-    """Run OCR on a PDF page using pytesseract."""
+    """Run OCR on a single PDF page using pytesseract.
+
+    OCR (Optical Character Recognition) converts an image of text into
+    actual text characters. We render the PDF page as a 300-DPI image
+    (high enough resolution for accurate recognition) and pass it to
+    the Tesseract OCR engine.
+    """
     import pytesseract
     from PIL import Image
 
+    # Render the PDF page to a pixel-map (bitmap image) at 300 DPI.
+    # Higher DPI means more detail, which improves OCR accuracy.
     pix = page.get_pixmap(dpi=300)
+    # Convert the raw pixel data into a PIL Image object that pytesseract can read.
     img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+    # Run Tesseract OCR on the image and return the recognized text.
     return pytesseract.image_to_string(img, lang=settings.ocr_language)
 
 
@@ -91,15 +115,22 @@ def extract_text_from_pdf(file_bytes: bytes) -> List[PageContent]:
     pages: List[PageContent] = []
 
     for page_num, page in enumerate(doc, start=1):
+        # First, try to extract text from the PDF's native text layer.
+        # This works for digitally-created PDFs but returns little/no text
+        # for scanned documents (which are essentially images).
         text = page.get_text() or ""
 
+        # OCR fallback logic: if the PDF page has fewer characters than
+        # the configured threshold (ocr_min_text_threshold), it is probably
+        # a scanned document — the page is an image, not searchable text.
+        # In that case, we use OCR to "read" the image and extract text.
         if settings.ocr_enabled and len(text.strip()) < settings.ocr_min_text_threshold:
             try:
                 ocr_text = _ocr_page(page)
                 if ocr_text.strip():
                     text = ocr_text
             except Exception:
-                pass  # Keep whatever text we got from fitz
+                pass  # OCR failed; keep whatever text we got from the native layer
 
         # Multimodal: extract and describe images on the page
         if settings.multimodal_enabled:
@@ -116,18 +147,30 @@ def extract_text_from_bytes(file_bytes: bytes) -> str:
 
 
 def chunk_text(text: str) -> List[str]:
-    """Original fixed-size chunking (character-level with overlap)."""
+    """Fixed-size chunking (character-level with overlap).
+
+    This is the simpler chunking strategy. It slides a fixed-size window
+    across the text, advancing by (chunk_size - chunk_overlap) characters
+    each step. The overlap ensures that information near a chunk boundary
+    is not lost — it appears in both the current chunk and the next one,
+    so the embedding model can capture context that spans the boundary.
+    """
+    # Collapse all whitespace (newlines, tabs, multiple spaces) into single
+    # spaces so chunks are clean and consistently formatted.
     normalized_text = " ".join(text.split())
     if not normalized_text:
         return []
 
     chunks: List[str] = []
+    # The step size determines how far we advance the window each iteration.
+    # By subtracting chunk_overlap, consecutive chunks share some text.
     step = max(settings.chunk_size - settings.chunk_overlap, 1)
     for start in range(0, len(normalized_text), step):
         end = start + settings.chunk_size
         chunk = normalized_text[start:end]
         if chunk:
             chunks.append(chunk)
+        # Stop once we have reached the end of the text.
         if end >= len(normalized_text):
             break
     return chunks
@@ -136,16 +179,38 @@ def chunk_text(text: str) -> List[str]:
 def smart_chunk_text(pages: List[PageContent]) -> List[ChunkWithMetadata]:
     """Split pages into chunks using paragraph and sentence boundaries.
 
-    Each chunk tracks which page(s) it came from. Respects chunk_size
-    and chunk_overlap from settings.
+    Unlike the simple fixed-size chunker (chunk_text), this "smart" chunker
+    tries to keep semantically meaningful units together. The algorithm has
+    three steps:
+
+    Step 1 — Paragraph detection:
+        Split each page's text on double newlines. Each resulting block is
+        treated as a paragraph — a self-contained unit of meaning.
+
+    Step 2 — Sentence splitting (for oversized paragraphs):
+        If a paragraph is longer than the configured chunk_size, we break
+        it into individual sentences so no single segment is too large
+        for the embedding model.
+
+    Step 3 — Chunk merging:
+        Walk through all segments and greedily merge them into chunks. We
+        keep adding segments to the current chunk as long as the total
+        length stays within chunk_size. When a new segment would exceed
+        the limit, we finalize the current chunk and start a new one —
+        optionally carrying over the tail end of the previous chunk
+        (the "overlap") so that context near the boundary is preserved.
+
+    Each chunk records which page number(s) its content came from, which
+    allows the UI to show page references alongside search results.
     """
     chunk_size = settings.chunk_size
     chunk_overlap = settings.chunk_overlap
 
-    # Build a list of (paragraph_text, page_number) tuples
+    # ── Step 1: Paragraph detection ──────────────────────────────────────
+    # Split each page's text by double newlines (blank lines between
+    # paragraphs). This preserves the document's natural structure.
     paragraphs: List[Tuple[str, int]] = []
     for page in pages:
-        # Split by double newlines (paragraph boundaries)
         raw_paragraphs = re.split(r"\n\s*\n", page.text)
         for para in raw_paragraphs:
             cleaned = para.strip()
@@ -155,34 +220,43 @@ def smart_chunk_text(pages: List[PageContent]) -> List[ChunkWithMetadata]:
     if not paragraphs:
         return []
 
-    # Split paragraphs that exceed chunk_size into sentences
+    # ── Step 2: Sentence splitting ───────────────────────────────────────
+    # If a paragraph is too long to fit in a single chunk, break it into
+    # sentences. The regex splits after sentence-ending punctuation
+    # (periods, exclamation marks, question marks — including Chinese
+    # equivalents) followed by whitespace.
     segments: List[Tuple[str, int]] = []
     sentence_pattern = re.compile(r"(?<=[.!?。！？])\s+")
     for para_text, page_num in paragraphs:
         if len(para_text) <= chunk_size:
+            # Paragraph fits in one chunk — keep it as a single segment.
             segments.append((para_text, page_num))
         else:
+            # Paragraph is too long — split it into individual sentences.
             sentences = sentence_pattern.split(para_text)
             for sentence in sentences:
                 sentence = sentence.strip()
                 if sentence:
                     segments.append((sentence, page_num))
 
-    # Merge segments into chunks respecting chunk_size
+    # ── Step 3: Chunk merging ────────────────────────────────────────────
+    # Greedily merge segments into chunks, respecting the maximum chunk_size.
     chunks: List[ChunkWithMetadata] = []
     current_text = ""
     current_pages: List[int] = []
     chunk_index = 0
 
     for seg_text, page_num in segments:
+        # Try appending the next segment to the current chunk.
         candidate = (current_text + "\n\n" + seg_text).strip() if current_text else seg_text
 
         if len(candidate) <= chunk_size:
+            # It fits — keep building the current chunk.
             current_text = candidate
             if page_num not in current_pages:
                 current_pages.append(page_num)
         else:
-            # Flush current chunk
+            # It does not fit — finalize (flush) the current chunk.
             if current_text:
                 chunks.append(ChunkWithMetadata(
                     text=current_text,
@@ -191,7 +265,10 @@ def smart_chunk_text(pages: List[PageContent]) -> List[ChunkWithMetadata]:
                 ))
                 chunk_index += 1
 
-                # Handle overlap: keep tail of current_text
+                # Handle overlap: carry over the last `chunk_overlap` characters
+                # from the just-finalized chunk into the new one. This ensures
+                # that information near chunk boundaries appears in both chunks,
+                # improving retrieval quality for queries that span a boundary.
                 if chunk_overlap > 0 and len(current_text) > chunk_overlap:
                     overlap_text = current_text[-chunk_overlap:]
                     current_text = (overlap_text + "\n\n" + seg_text).strip()
@@ -202,11 +279,13 @@ def smart_chunk_text(pages: List[PageContent]) -> List[ChunkWithMetadata]:
                     current_text = seg_text
                     current_pages = [page_num]
             else:
-                # Single segment exceeds chunk_size; include it as-is
+                # Edge case: a single segment exceeds chunk_size. We cannot
+                # split it further without breaking mid-sentence, so we
+                # accept it as-is. It will be slightly oversized.
                 current_text = seg_text
                 current_pages = [page_num]
 
-    # Flush remaining
+    # Flush any remaining text as the final chunk.
     if current_text.strip():
         chunks.append(ChunkWithMetadata(
             text=current_text,
@@ -218,6 +297,14 @@ def smart_chunk_text(pages: List[PageContent]) -> List[ChunkWithMetadata]:
 
 
 def normalize_ingest_filename(filename: str) -> str:
+    """Sanitize a user-provided filename for safe storage.
+
+    Why we do this:
+    - Users might upload files with special characters, spaces, or even
+      directory traversal payloads like "../../etc/passwd".
+    - We strip everything except the basename, replace unsafe characters
+      with underscores, and validate the extension against an allow-list.
+    """
     if not filename:
         raise ValueError("Filename is required")
 
@@ -245,6 +332,14 @@ def validate_ingest_filename(filename: str) -> str:
 
 
 def ingest_document(file_bytes: bytes, filename: str, tenant_id: str) -> Tuple[str, int]:
+    """Main entry point for the ingestion pipeline.
+
+    Takes raw file bytes, extracts text (with OCR fallback for scanned PDFs
+    and Gemini Vision for images), splits the text into chunks, embeds them,
+    and stores the vectors in Qdrant.
+
+    Returns a tuple of (document_id, number_of_chunks_created).
+    """
     import time
     from app.core.metrics import DOCUMENT_INGEST_TOTAL, DOCUMENT_INGEST_DURATION, CHUNKS_PRODUCED_TOTAL
 
