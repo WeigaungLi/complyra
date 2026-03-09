@@ -124,8 +124,8 @@ resource "aws_cloudwatch_metric_alarm" "alb_unhealthy_hosts" {
   treat_missing_data  = "notBreaching"
 
   dimensions = {
-    LoadBalancer  = aws_lb.app.arn_suffix
-    TargetGroup   = aws_lb_target_group.api.arn_suffix
+    LoadBalancer = aws_lb.app.arn_suffix
+    TargetGroup  = aws_lb_target_group.api.arn_suffix
   }
 
   tags = local.tags

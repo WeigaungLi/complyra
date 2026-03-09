@@ -51,6 +51,7 @@ class Tenant(Base):
 
     Think of a tenant as a "workspace" or "company account".
     """
+
     __tablename__ = "tenants"
 
     # A short unique identifier for the tenant (e.g., "acme-corp").
@@ -58,7 +59,9 @@ class Tenant(Base):
     # A human-friendly display name (e.g., "Acme Corporation").
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     # When this tenant was created; automatically set to the current time.
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), default=utcnow_naive, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=False), default=utcnow_naive, nullable=False
+    )
 
 
 class User(Base):
@@ -68,10 +71,13 @@ class User(Base):
     that controls what they are allowed to do, and an optional default
     tenant (the workspace they see when they first log in).
     """
+
     __tablename__ = "users"
 
     # Unique ID for this user, auto-generated as a UUID if not provided.
-    user_id: Mapped[str] = mapped_column(String(128), primary_key=True, default=lambda: str(uuid4()))
+    user_id: Mapped[str] = mapped_column(
+        String(128), primary_key=True, default=lambda: str(uuid4())
+    )
     # The login name; must be unique across the entire system. Indexed for fast lookups during login.
     username: Mapped[str] = mapped_column(String(128), unique=True, nullable=False, index=True)
     # The password is never stored in plain text — only a secure hash.
@@ -81,9 +87,13 @@ class User(Base):
     # The tenant this user sees by default after login. Can be empty (NULL)
     # if the user hasn't been assigned a default workspace yet.
     # This connects the User table to the Tenant table via tenant_id.
-    default_tenant_id: Mapped[Optional[str]] = mapped_column(String(128), ForeignKey("tenants.tenant_id"), nullable=True)
+    default_tenant_id: Mapped[Optional[str]] = mapped_column(
+        String(128), ForeignKey("tenants.tenant_id"), nullable=True
+    )
     # When this user account was created.
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), default=utcnow_naive, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=False), default=utcnow_naive, nullable=False
+    )
 
     # This connects User to UserTenant — lets you access all the tenants
     # a user belongs to via user.tenant_links. "cascade=all, delete-orphan"
@@ -98,6 +108,7 @@ class UserTenant(Base):
     can have multiple users. This "junction table" records which users
     belong to which tenants. Each row says: "User X has access to Tenant Y."
     """
+
     __tablename__ = "user_tenants"
     __table_args__ = (
         # Prevents duplicate entries — a user can only be linked to a tenant once.
@@ -112,9 +123,13 @@ class UserTenant(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     # Which user this link is for. "ondelete=CASCADE" means if the user is
     # deleted from the users table, this link row is automatically removed.
-    user_id: Mapped[str] = mapped_column(String(128), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[str] = mapped_column(
+        String(128), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False
+    )
     # Which tenant this link is for. Also cascades on delete.
-    tenant_id: Mapped[str] = mapped_column(String(128), ForeignKey("tenants.tenant_id", ondelete="CASCADE"), nullable=False)
+    tenant_id: Mapped[str] = mapped_column(
+        String(128), ForeignKey("tenants.tenant_id", ondelete="CASCADE"), nullable=False
+    )
 
     # This connects UserTenant back to User, creating a two-way link.
     # From a UserTenant row you can access the full User object via .user.
@@ -131,6 +146,7 @@ class Approval(Base):
 
     Typical status flow: "pending" -> "approved" or "rejected".
     """
+
     __tablename__ = "approvals"
     __table_args__ = (
         # This index speeds up the common query: "show me all pending approvals
@@ -141,11 +157,15 @@ class Approval(Base):
     )
 
     # Unique ID for this approval request, auto-generated as a UUID.
-    approval_id: Mapped[str] = mapped_column(String(128), primary_key=True, default=lambda: str(uuid4()))
+    approval_id: Mapped[str] = mapped_column(
+        String(128), primary_key=True, default=lambda: str(uuid4())
+    )
     # The user who asked the original question. Links to the users table.
     user_id: Mapped[str] = mapped_column(String(128), ForeignKey("users.user_id"), nullable=False)
     # Which tenant (workspace) this approval belongs to.
-    tenant_id: Mapped[str] = mapped_column(String(128), ForeignKey("tenants.tenant_id"), nullable=False)
+    tenant_id: Mapped[str] = mapped_column(
+        String(128), ForeignKey("tenants.tenant_id"), nullable=False
+    )
     # The original question that was asked.
     question: Mapped[str] = mapped_column(Text, nullable=False)
     # The AI-generated answer that is waiting for review.
@@ -156,7 +176,9 @@ class Approval(Base):
     # Current state of this approval. Values: "pending", "approved", "rejected".
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="pending")
     # When the approval request was created.
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), default=utcnow_naive, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=False), default=utcnow_naive, nullable=False
+    )
     # When a reviewer made their decision. NULL while still pending.
     decided_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=False), nullable=True)
     # Username or ID of the person who approved/rejected. NULL while pending.
@@ -175,6 +197,7 @@ class AuditLog(Base):
     Each row stores the user's input, the system's output, and extra
     metadata (as a JSON string) for context.
     """
+
     __tablename__ = "audit_logs"
     __table_args__ = (
         # This index speeds up the common query: "show me recent logs for
@@ -187,7 +210,9 @@ class AuditLog(Base):
     # Auto-incrementing row ID.
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     # When this action occurred.
-    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=False), default=utcnow_naive, nullable=False)
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=False), default=utcnow_naive, nullable=False
+    )
     # Which tenant this action happened in.
     tenant_id: Mapped[str] = mapped_column(String(128), nullable=False)
     # Who performed the action (username).
@@ -214,6 +239,7 @@ class IngestJob(Base):
 
     Typical status flow: "queued" -> "processing" -> "done" or "failed".
     """
+
     __tablename__ = "ingest_jobs"
     __table_args__ = (
         # This index speeds up: "show me recent upload jobs for tenant X".
@@ -225,9 +251,13 @@ class IngestJob(Base):
     # Unique ID for this job.
     job_id: Mapped[str] = mapped_column(String(128), primary_key=True)
     # Which tenant owns this job. Links to the tenants table.
-    tenant_id: Mapped[str] = mapped_column(String(128), ForeignKey("tenants.tenant_id"), nullable=False)
+    tenant_id: Mapped[str] = mapped_column(
+        String(128), ForeignKey("tenants.tenant_id"), nullable=False
+    )
     # The user who uploaded the file. Links to the users table.
-    created_by: Mapped[str] = mapped_column(String(128), ForeignKey("users.user_id"), nullable=False)
+    created_by: Mapped[str] = mapped_column(
+        String(128), ForeignKey("users.user_id"), nullable=False
+    )
     # Original name of the uploaded file.
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
     # Current processing state. Values: "queued", "processing", "done", "failed".
@@ -240,9 +270,13 @@ class IngestJob(Base):
     # If the job failed, this stores the error message. NULL on success.
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     # When the job was created (i.e., when the file was uploaded).
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), default=utcnow_naive, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=False), default=utcnow_naive, nullable=False
+    )
     # When the job was last updated (e.g., status changed, chunks increased).
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), default=utcnow_naive, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=False), default=utcnow_naive, nullable=False
+    )
 
 
 class Document(Base):
@@ -253,6 +287,7 @@ class Document(Base):
     how the document behaves in the system (sensitivity level, active/archived
     status, and whether it requires approval before its content can be shown).
     """
+
     __tablename__ = "documents"
     __table_args__ = (
         # This index speeds up: "show me all active documents for tenant X".
@@ -264,11 +299,15 @@ class Document(Base):
     # Unique ID for this document.
     document_id: Mapped[str] = mapped_column(String(128), primary_key=True)
     # Which tenant owns this document. Links to the tenants table.
-    tenant_id: Mapped[str] = mapped_column(String(128), ForeignKey("tenants.tenant_id"), nullable=False)
+    tenant_id: Mapped[str] = mapped_column(
+        String(128), ForeignKey("tenants.tenant_id"), nullable=False
+    )
     # Original filename (e.g., "policy_manual.pdf").
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
     # File format identifier (e.g., "application/pdf", "text/plain").
-    mime_type: Mapped[str] = mapped_column(String(128), nullable=False, default="application/octet-stream")
+    mime_type: Mapped[str] = mapped_column(
+        String(128), nullable=False, default="application/octet-stream"
+    )
     # File size in bytes.
     file_size: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     # Number of pages in the original document (0 for non-paginated formats).
@@ -290,11 +329,17 @@ class Document(Base):
     # Where the original file is stored on disk or in cloud storage.
     storage_path: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     # The user who uploaded this document. Links to the users table.
-    created_by: Mapped[str] = mapped_column(String(128), ForeignKey("users.user_id"), nullable=False)
+    created_by: Mapped[str] = mapped_column(
+        String(128), ForeignKey("users.user_id"), nullable=False
+    )
     # When the document record was created.
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), default=utcnow_naive, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=False), default=utcnow_naive, nullable=False
+    )
     # When the document was last modified (e.g., sensitivity changed).
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), default=utcnow_naive, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=False), default=utcnow_naive, nullable=False
+    )
 
 
 class TenantPolicy(Base):
@@ -310,15 +355,20 @@ class TenantPolicy(Base):
 
     Individual documents can override this via their approval_override field.
     """
+
     __tablename__ = "tenant_policies"
 
     # The tenant this policy applies to. Also serves as the primary key,
     # meaning each tenant can have at most one policy row.
-    tenant_id: Mapped[str] = mapped_column(String(128), ForeignKey("tenants.tenant_id"), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(
+        String(128), ForeignKey("tenants.tenant_id"), primary_key=True
+    )
     # The approval mode for this tenant. See class docstring for values.
     approval_mode: Mapped[str] = mapped_column(String(32), nullable=False, default="all")
     # When the policy was last changed.
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), default=utcnow_naive, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=False), default=utcnow_naive, nullable=False
+    )
     # Who last changed this policy (username or user_id). Can be NULL if
     # the policy was created automatically by the system.
     updated_by: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)

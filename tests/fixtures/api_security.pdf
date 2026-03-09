@@ -1,0 +1,51 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 1152 >>
+stream
+BT /F1 12 Tf 72 720 Td (API Security Guidelines v2.1) Tj ET
+BT /F1 12 Tf 72 704 Td () Tj ET
+BT /F1 12 Tf 72 688 Td (1. Authentication) Tj ET
+BT /F1 12 Tf 72 672 Td (All API endpoints must require authentication.) Tj ET
+BT /F1 12 Tf 72 656 Td (Use OAuth 2.0 or JWT tokens.) Tj ET
+BT /F1 12 Tf 72 640 Td (Token expiry should not exceed 1 hour.) Tj ET
+BT /F1 12 Tf 72 624 Td () Tj ET
+BT /F1 12 Tf 72 608 Td (2. Rate Limiting) Tj ET
+BT /F1 12 Tf 72 592 Td (Implement rate limiting on all public endpoints.) Tj ET
+BT /F1 12 Tf 72 576 Td (Default: 100 requests per minute per API key.) Tj ET
+BT /F1 12 Tf 72 560 Td () Tj ET
+BT /F1 12 Tf 72 544 Td (3. Input Validation) Tj ET
+BT /F1 12 Tf 72 528 Td (Validate all input parameters.) Tj ET
+BT /F1 12 Tf 72 512 Td (Sanitize to prevent SQL injection and XSS.) Tj ET
+BT /F1 12 Tf 72 496 Td (Maximum payload size: 10MB.) Tj ET
+BT /F1 12 Tf 72 480 Td () Tj ET
+BT /F1 12 Tf 72 464 Td (4. Encryption) Tj ET
+BT /F1 12 Tf 72 448 Td (TLS 1.2+ required for all API traffic.) Tj ET
+BT /F1 12 Tf 72 432 Td (Sensitive fields must be encrypted at rest.) Tj ET
+BT /F1 12 Tf 72 416 Td (API keys must never appear in URLs.) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000001445 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1515
+%%EOF

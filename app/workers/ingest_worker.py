@@ -37,6 +37,7 @@ def _count_pages(file_path: str, extension: str) -> int:
         return 0
     try:
         import fitz
+
         doc = fitz.open(file_path)
         count = len(doc)
         doc.close()
@@ -90,7 +91,9 @@ def process_ingest_job(job_id: str, file_path: str, filename: str, tenant_id: st
     try:
         document_id, chunks_indexed = ingest_document_from_path(file_path, filename, tenant_id)
         if not document_id:
-            update_ingest_job(job_id=job_id, status="failed", error_message="No text extracted from file")
+            update_ingest_job(
+                job_id=job_id, status="failed", error_message="No text extracted from file"
+            )
             return {"status": "failed", "job_id": job_id}
 
         # Determine page count and move file for preview
@@ -104,6 +107,7 @@ def process_ingest_job(job_id: str, file_path: str, filename: str, tenant_id: st
         created_by = job.created_by if job else "unknown"
 
         from app.services.documents import create_document
+
         create_document(
             document_id=document_id,
             tenant_id=tenant_id,

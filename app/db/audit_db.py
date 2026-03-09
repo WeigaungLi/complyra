@@ -38,7 +38,16 @@ from uuid import uuid4
 
 from sqlalchemy import and_, func, select
 
-from app.db.models import Approval, AuditLog, Document, IngestJob, Tenant, TenantPolicy, User, UserTenant
+from app.db.models import (
+    Approval,
+    AuditLog,
+    Document,
+    IngestJob,
+    Tenant,
+    TenantPolicy,
+    User,
+    UserTenant,
+)
 from app.db.session import Base, SessionLocal, engine
 
 
@@ -53,6 +62,7 @@ def utcnow_naive() -> datetime:
 
 # ── Database Initialization ───────────────────────────────────────────
 
+
 def init_db() -> None:
     """Create all database tables if they don't already exist.
 
@@ -65,6 +75,7 @@ def init_db() -> None:
 
 
 # ── Audit Log Operations ─────────────────────────────────────────────
+
 
 def insert_log(
     *,
@@ -109,7 +120,12 @@ def list_logs(*, tenant_ids: list[str], limit: int = 100) -> list[AuditLog]:
         #   WHERE tenant_id IN (:tenant_ids)
         #   ORDER BY id DESC   (newest first)
         #   LIMIT :limit
-        query = select(AuditLog).where(AuditLog.tenant_id.in_(tenant_ids)).order_by(AuditLog.id.desc()).limit(limit)
+        query = (
+            select(AuditLog)
+            .where(AuditLog.tenant_id.in_(tenant_ids))
+            .order_by(AuditLog.id.desc())
+            .limit(limit)
+        )
         return list(db.execute(query).scalars())
 
 
@@ -150,6 +166,7 @@ def search_logs(
 
 # ── Tenant Operations ─────────────────────────────────────────────────
 
+
 def create_tenant(*, tenant_id: str, name: str) -> Tenant:
     """Create a new tenant (organization/workspace) in the database.
 
@@ -181,6 +198,7 @@ def get_tenant(tenant_id: str) -> Optional[Tenant]:
 
 
 # ── User Operations ───────────────────────────────────────────────────
+
 
 def create_user(
     *,
@@ -236,6 +254,7 @@ def list_users() -> list[User]:
 
 # ── User-Tenant Assignment Operations ─────────────────────────────────
 
+
 def assign_user_tenant(*, user_id: str, tenant_id: str) -> UserTenant:
     """Grant a user access to a tenant. If already assigned, return the existing link.
 
@@ -246,7 +265,9 @@ def assign_user_tenant(*, user_id: str, tenant_id: str) -> UserTenant:
     with SessionLocal() as db:
         # Check if this user-tenant link already exists
         existing = db.execute(
-            select(UserTenant).where(and_(UserTenant.user_id == user_id, UserTenant.tenant_id == tenant_id))
+            select(UserTenant).where(
+                and_(UserTenant.user_id == user_id, UserTenant.tenant_id == tenant_id)
+            )
         ).scalar_one_or_none()
         if existing:
             return existing
@@ -276,12 +297,15 @@ def user_has_tenant(*, user_id: str, tenant_id: str) -> bool:
     """
     with SessionLocal() as db:
         row = db.execute(
-            select(UserTenant).where(and_(UserTenant.user_id == user_id, UserTenant.tenant_id == tenant_id))
+            select(UserTenant).where(
+                and_(UserTenant.user_id == user_id, UserTenant.tenant_id == tenant_id)
+            )
         ).scalar_one_or_none()
         return row is not None
 
 
 # ── Approval Operations ───────────────────────────────────────────────
+
 
 def create_approval(
     *,
@@ -362,6 +386,7 @@ def update_approval(
 
 # ── Ingest Job Operations ─────────────────────────────────────────────
 
+
 def create_ingest_job(*, job_id: str, tenant_id: str, created_by: str, filename: str) -> IngestJob:
     """Create a new document ingestion job with status "queued".
 
@@ -369,7 +394,13 @@ def create_ingest_job(*, job_id: str, tenant_id: str, created_by: str, filename:
     queued jobs, process the file, and update the status accordingly.
     """
     with SessionLocal() as db:
-        job = IngestJob(job_id=job_id, tenant_id=tenant_id, created_by=created_by, filename=filename, status="queued")
+        job = IngestJob(
+            job_id=job_id,
+            tenant_id=tenant_id,
+            created_by=created_by,
+            filename=filename,
+            status="queued",
+        )
         db.add(job)
         db.commit()
         db.refresh(job)
@@ -416,11 +447,17 @@ def list_ingest_jobs(*, tenant_ids: list[str], limit: int) -> list[IngestJob]:
     Used by the UI to show the status of recent document uploads.
     """
     with SessionLocal() as db:
-        query = select(IngestJob).where(IngestJob.tenant_id.in_(tenant_ids)).order_by(IngestJob.created_at.desc()).limit(limit)
+        query = (
+            select(IngestJob)
+            .where(IngestJob.tenant_id.in_(tenant_ids))
+            .order_by(IngestJob.created_at.desc())
+            .limit(limit)
+        )
         return list(db.execute(query).scalars())
 
 
 # ── Document CRUD ──────────────────────────────────────────────────────
+
 
 def create_document_record(
     *,
@@ -487,7 +524,9 @@ def list_documents_db(
         query = select(Document).where(Document.tenant_id == tenant_id)
         # Build a parallel COUNT query to get the total number of matches
         # (needed for pagination — e.g., "showing 10 of 42 documents")
-        count_query = select(func.count()).select_from(Document).where(Document.tenant_id == tenant_id)
+        count_query = (
+            select(func.count()).select_from(Document).where(Document.tenant_id == tenant_id)
+        )
         # Apply optional status filter to both queries
         if status:
             query = query.where(Document.status == status)
@@ -594,6 +633,7 @@ def get_documents_by_ids(document_ids: list[str]) -> list[Document]:
 
 # ── TenantPolicy CRUD ──────────────────────────────────────────────────
 
+
 def get_tenant_policy(tenant_id: str) -> TenantPolicy | None:
     """Fetch the approval policy for a tenant. Returns None if no policy is set."""
     with SessionLocal() as db:
@@ -634,7 +674,10 @@ def upsert_tenant_policy(
 
 # ── Seed Data ──────────────────────────────────────────────────────────
 
-def ensure_default_seed(*, demo_username: str, demo_password_hash: str, default_tenant_id: str) -> None:
+
+def ensure_default_seed(
+    *, demo_username: str, demo_password_hash: str, default_tenant_id: str
+) -> None:
     """Create default tenant and admin user if they don't already exist.
 
     This is called at application startup to ensure there is always at

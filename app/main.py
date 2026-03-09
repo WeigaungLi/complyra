@@ -35,7 +35,9 @@ async def app_lifespan(_: FastAPI):
         default_tenant_id=settings.default_tenant_id,
     )
     if not ensure_model_ready():
-        logger.warning("Ollama model pre-pull failed. The service will still start, but first requests may fail.")
+        logger.warning(
+            "Ollama model pre-pull failed. The service will still start, but first requests may fail."
+        )
     yield
 
 
@@ -44,6 +46,7 @@ def create_app() -> FastAPI:
 
     # Attach in-memory log buffer for admin monitoring dashboard
     from app.core.log_buffer import BufferHandler
+
     root_logger = logging.getLogger()
     root_logger.addHandler(BufferHandler())
 

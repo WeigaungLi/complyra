@@ -1,0 +1,64 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R 5 0 R 7 0 R] /Count 3 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 9 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 267 >>
+stream
+BT /F1 12 Tf 72 720 Td (Chapter 1: Introduction) Tj ET
+BT /F1 12 Tf 72 704 Td () Tj ET
+BT /F1 12 Tf 72 688 Td (This document covers enterprise compliance requirements.) Tj ET
+BT /F1 12 Tf 72 672 Td (All organizations must adhere to data protection regulations.) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 6 0 R /Resources << /Font << /F1 9 0 R >> >> >>
+endobj
+6 0 obj
+<< /Length 253 >>
+stream
+BT /F1 12 Tf 72 720 Td (Chapter 2: Data Handling) Tj ET
+BT /F1 12 Tf 72 704 Td () Tj ET
+BT /F1 12 Tf 72 688 Td (Sensitive data must be encrypted at rest and in transit.) Tj ET
+BT /F1 12 Tf 72 672 Td (Access controls must be implemented with RBAC.) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 8 0 R /Resources << /Font << /F1 9 0 R >> >> >>
+endobj
+8 0 obj
+<< /Length 291 >>
+stream
+BT /F1 12 Tf 72 720 Td (Chapter 3: Audit Requirements) Tj ET
+BT /F1 12 Tf 72 704 Td () Tj ET
+BT /F1 12 Tf 72 688 Td (All data access must be logged.) Tj ET
+BT /F1 12 Tf 72 672 Td (Audit logs must be retained for 7 years.) Tj ET
+BT /F1 12 Tf 72 656 Td (Quarterly reviews are mandatory.) Tj ET
+endstream
+endobj
+9 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 10
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000127 00000 n 
+0000000253 00000 n 
+0000000571 00000 n 
+0000000697 00000 n 
+0000001001 00000 n 
+0000001127 00000 n 
+0000001469 00000 n 
+trailer
+<< /Size 10 /Root 1 0 R >>
+startxref
+1539
+%%EOF

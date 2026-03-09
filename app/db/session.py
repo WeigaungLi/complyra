@@ -81,7 +81,9 @@ engine = _create_engine()
 #   - expire_on_commit=False: After committing, objects remain usable in
 #     Python without triggering extra database reads. This is important
 #     because our functions often return objects after committing.
-SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False, class_=Session, expire_on_commit=False)
+SessionLocal = sessionmaker(
+    bind=engine, autocommit=False, autoflush=False, class_=Session, expire_on_commit=False
+)
 
 
 def get_db() -> Generator[Session, None, None]:

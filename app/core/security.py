@@ -21,7 +21,9 @@ def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
 
-def create_access_token(subject: str, role: str, user_id: str, default_tenant_id: Optional[str]) -> str:
+def create_access_token(
+    subject: str, role: str, user_id: str, default_tenant_id: Optional[str]
+) -> str:
     now_utc = datetime.now(timezone.utc)
     expire = now_utc + timedelta(minutes=settings.access_token_expire_minutes)
     to_encode: Dict[str, Any] = {

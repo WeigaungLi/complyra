@@ -67,7 +67,9 @@ def get_tenant_account(tenant_id: str):
     return get_tenant(tenant_id)
 
 
-def create_user_account(username: str, password: str, role: str, default_tenant_id: Optional[str]) -> str:
+def create_user_account(
+    username: str, password: str, role: str, default_tenant_id: Optional[str]
+) -> str:
     user_id = str(uuid4())
     password_hash = hash_password(password)
     create_user(

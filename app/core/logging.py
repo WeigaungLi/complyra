@@ -66,7 +66,16 @@ class JsonFormatter(logging.Formatter):
         # Optionally include extra contextual fields if they were passed
         # via the "extra" dict when the log call was made (e.g., by the
         # request logging middleware).
-        for field in ("method", "path", "status", "duration_ms", "client_ip", "action", "tenant_id", "user"):
+        for field in (
+            "method",
+            "path",
+            "status",
+            "duration_ms",
+            "client_ip",
+            "action",
+            "tenant_id",
+            "user",
+        ):
             value = getattr(record, field, None)
             if value is not None:
                 payload[field] = value
@@ -106,7 +115,9 @@ def setup_logging() -> None:
     else:
         # Use plain-text formatting for local development — easier to read
         stream_handler.setFormatter(
-            logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(request_id)s | %(message)s")
+            logging.Formatter(
+                "%(asctime)s | %(levelname)s | %(name)s | %(request_id)s | %(message)s"
+            )
         )
 
     root.addHandler(stream_handler)

@@ -82,10 +82,9 @@ def rewrite_node(state: WorkflowState) -> WorkflowState:
             # asyncio.run() directly on this thread. Instead, we run it
             # in a separate thread that has its own fresh event loop.
             import concurrent.futures
+
             with concurrent.futures.ThreadPoolExecutor() as pool:
-                rewritten = pool.submit(
-                    lambda: asyncio.run(rewrite_query(question))
-                ).result()
+                rewritten = pool.submit(lambda: asyncio.run(rewrite_query(question))).result()
         else:
             rewritten = loop.run_until_complete(rewrite_query(question))
     except RuntimeError:
@@ -167,6 +166,7 @@ def judge_node(state: WorkflowState) -> WorkflowState:
         loop = asyncio.get_event_loop()
         if loop.is_running():
             import concurrent.futures
+
             with concurrent.futures.ThreadPoolExecutor() as pool:
                 result = pool.submit(
                     lambda: asyncio.run(judge_relevance(question, contexts))
@@ -178,7 +178,9 @@ def judge_node(state: WorkflowState) -> WorkflowState:
 
     logger.info(
         "Relevance judge (attempt %d): sufficient=%s, sub_questions=%s",
-        attempts, result["is_sufficient"], result.get("sub_questions", []),
+        attempts,
+        result["is_sufficient"],
+        result.get("sub_questions", []),
     )
 
     if result["is_sufficient"]:
@@ -235,6 +237,7 @@ def route_after_draft(state: WorkflowState) -> str:
         return "final"
 
     from app.services.approval_policy import should_require_approval
+
     doc_ids = state.get("source_document_ids", [])
     if should_require_approval(state["tenant_id"], doc_ids):
         return "approval"
@@ -283,6 +286,4 @@ workflow_graph = builder.compile()
 
 def run_workflow(question: str, tenant_id: str, user_id: str) -> WorkflowState:
     """Execute the full RAG workflow and return the final state."""
-    return workflow_graph.invoke(
-        {"question": question, "tenant_id": tenant_id, "user_id": user_id}
-    )
+    return workflow_graph.invoke({"question": question, "tenant_id": tenant_id, "user_id": user_id})

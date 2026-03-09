@@ -40,6 +40,7 @@ FILENAME_SANITIZE_PATTERN = re.compile(r"[^A-Za-z0-9._-]+")
 @dataclass
 class PageContent:
     """Text content extracted from a single PDF page."""
+
     text: str
     page_number: int
 
@@ -47,6 +48,7 @@ class PageContent:
 @dataclass
 class ChunkWithMetadata:
     """A text chunk with metadata about its source pages."""
+
     text: str
     page_numbers: List[int] = field(default_factory=list)
     chunk_index: int = 0
@@ -258,11 +260,13 @@ def smart_chunk_text(pages: List[PageContent]) -> List[ChunkWithMetadata]:
         else:
             # It does not fit — finalize (flush) the current chunk.
             if current_text:
-                chunks.append(ChunkWithMetadata(
-                    text=current_text,
-                    page_numbers=list(current_pages),
-                    chunk_index=chunk_index,
-                ))
+                chunks.append(
+                    ChunkWithMetadata(
+                        text=current_text,
+                        page_numbers=list(current_pages),
+                        chunk_index=chunk_index,
+                    )
+                )
                 chunk_index += 1
 
                 # Handle overlap: carry over the last `chunk_overlap` characters
@@ -287,11 +291,13 @@ def smart_chunk_text(pages: List[PageContent]) -> List[ChunkWithMetadata]:
 
     # Flush any remaining text as the final chunk.
     if current_text.strip():
-        chunks.append(ChunkWithMetadata(
-            text=current_text,
-            page_numbers=list(current_pages),
-            chunk_index=chunk_index,
-        ))
+        chunks.append(
+            ChunkWithMetadata(
+                text=current_text,
+                page_numbers=list(current_pages),
+                chunk_index=chunk_index,
+            )
+        )
 
     return chunks
 
@@ -341,7 +347,12 @@ def ingest_document(file_bytes: bytes, filename: str, tenant_id: str) -> Tuple[s
     Returns a tuple of (document_id, number_of_chunks_created).
     """
     import time
-    from app.core.metrics import DOCUMENT_INGEST_TOTAL, DOCUMENT_INGEST_DURATION, CHUNKS_PRODUCED_TOTAL
+
+    from app.core.metrics import (
+        CHUNKS_PRODUCED_TOTAL,
+        DOCUMENT_INGEST_DURATION,
+        DOCUMENT_INGEST_TOTAL,
+    )
 
     ingest_start = time.perf_counter()
     extension = validate_ingest_filename(filename)
@@ -362,7 +373,9 @@ def ingest_document(file_bytes: bytes, filename: str, tenant_id: str) -> Tuple[s
             document_id = upsert_chunks(chunks, source=filename, tenant_id=tenant_id)
             CHUNKS_PRODUCED_TOTAL.inc(len(chunks))
             DOCUMENT_INGEST_TOTAL.labels(file_type=extension, status="success").inc()
-            DOCUMENT_INGEST_DURATION.labels(file_type=extension).observe(time.perf_counter() - ingest_start)
+            DOCUMENT_INGEST_DURATION.labels(file_type=extension).observe(
+                time.perf_counter() - ingest_start
+            )
             return document_id, len(chunks)
         elif extension == "pdf":
             pages = extract_text_from_pdf(file_bytes)
@@ -382,7 +395,9 @@ def ingest_document(file_bytes: bytes, filename: str, tenant_id: str) -> Tuple[s
                 )
                 CHUNKS_PRODUCED_TOTAL.inc(len(smart_chunks))
                 DOCUMENT_INGEST_TOTAL.labels(file_type="pdf", status="success").inc()
-                DOCUMENT_INGEST_DURATION.labels(file_type="pdf").observe(time.perf_counter() - ingest_start)
+                DOCUMENT_INGEST_DURATION.labels(file_type="pdf").observe(
+                    time.perf_counter() - ingest_start
+                )
                 return document_id, len(smart_chunks)
             else:
                 full_text = "\n".join(p.text for p in pages)
@@ -393,7 +408,9 @@ def ingest_document(file_bytes: bytes, filename: str, tenant_id: str) -> Tuple[s
                 document_id = upsert_chunks(chunks, source=filename, tenant_id=tenant_id)
                 CHUNKS_PRODUCED_TOTAL.inc(len(chunks))
                 DOCUMENT_INGEST_TOTAL.labels(file_type="pdf", status="success").inc()
-                DOCUMENT_INGEST_DURATION.labels(file_type="pdf").observe(time.perf_counter() - ingest_start)
+                DOCUMENT_INGEST_DURATION.labels(file_type="pdf").observe(
+                    time.perf_counter() - ingest_start
+                )
                 return document_id, len(chunks)
         else:
             text = extract_text_from_bytes(file_bytes)
@@ -404,7 +421,9 @@ def ingest_document(file_bytes: bytes, filename: str, tenant_id: str) -> Tuple[s
             document_id = upsert_chunks(chunks, source=filename, tenant_id=tenant_id)
             CHUNKS_PRODUCED_TOTAL.inc(len(chunks))
             DOCUMENT_INGEST_TOTAL.labels(file_type=extension, status="success").inc()
-            DOCUMENT_INGEST_DURATION.labels(file_type=extension).observe(time.perf_counter() - ingest_start)
+            DOCUMENT_INGEST_DURATION.labels(file_type=extension).observe(
+                time.perf_counter() - ingest_start
+            )
             return document_id, len(chunks)
     except Exception:
         DOCUMENT_INGEST_TOTAL.labels(file_type=extension, status="error").inc()

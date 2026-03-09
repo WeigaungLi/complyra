@@ -39,7 +39,8 @@ def chat(
 ) -> ChatResponse:
     """Synchronous chat endpoint — returns a complete JSON response."""
     import time
-    from app.core.metrics import RAG_QUERY_TOTAL, RAG_QUERY_DURATION
+
+    from app.core.metrics import RAG_QUERY_DURATION, RAG_QUERY_TOTAL
 
     rag_start = time.perf_counter()
     state = run_workflow(payload.question, tenant_id, user["user_id"])
@@ -87,9 +88,7 @@ def chat(
     RAG_QUERY_TOTAL.labels(status=rag_status).inc()
     RAG_QUERY_DURATION.observe(time.perf_counter() - rag_start)
 
-    return ChatResponse(
-        status=status, answer=answer, retrieved=retrieved, approval_id=approval_id
-    )
+    return ChatResponse(status=status, answer=answer, retrieved=retrieved, approval_id=approval_id)
 
 
 def _sse_event(event: str, data: dict) -> str:
@@ -115,10 +114,13 @@ async def chat_stream(
         if settings.query_rewrite_enabled:
             yield _sse_event("rewrite_start", {})
             rewritten = await rewrite_query(question)
-            yield _sse_event("rewrite_done", {
-                "original_query": question,
-                "rewritten_query": rewritten,
-            })
+            yield _sse_event(
+                "rewrite_done",
+                {
+                    "original_query": question,
+                    "rewritten_query": rewritten,
+                },
+            )
             search_query = rewritten
         else:
             search_query = question
@@ -157,10 +159,13 @@ async def chat_stream(
                 {"text": t, "score": s, "source": src, "page_numbers": pgs}
                 for t, s, src, pgs in all_matches
             ]
-            yield _sse_event("retrieve_done", {
-                "attempt": attempt,
-                "retrieved": retrieved,
-            })
+            yield _sse_event(
+                "retrieve_done",
+                {
+                    "attempt": attempt,
+                    "retrieved": retrieved,
+                },
+            )
 
             # Judge relevance (if ReAct enabled and not last attempt)
             if settings.react_retrieval_enabled and attempt < max_attempts:
@@ -169,12 +174,15 @@ async def chat_stream(
                 judge_result = await judge_relevance(question, contexts)
                 is_sufficient = judge_result["is_sufficient"]
                 sub_questions = judge_result.get("sub_questions", [])
-                yield _sse_event("judge_done", {
-                    "attempt": attempt,
-                    "is_sufficient": is_sufficient,
-                    "sub_questions": sub_questions,
-                    "reasoning": judge_result.get("reasoning", ""),
-                })
+                yield _sse_event(
+                    "judge_done",
+                    {
+                        "attempt": attempt,
+                        "is_sufficient": is_sufficient,
+                        "sub_questions": sub_questions,
+                        "reasoning": judge_result.get("reasoning", ""),
+                    },
+                )
 
                 if is_sufficient or not sub_questions:
                     break
@@ -197,9 +205,7 @@ async def chat_stream(
         answer_text = "".join(full_answer)
         policy_result = await asyncio.to_thread(evaluate_output_policy, answer_text)
         if policy_result.blocked:
-            yield _sse_event(
-                "policy_blocked", {"violations": policy_result.matched_rules}
-            )
+            yield _sse_event("policy_blocked", {"violations": policy_result.matched_rules})
             answer_text = settings.output_policy_block_message
         else:
             yield _sse_event("policy_passed", {})
@@ -214,9 +220,7 @@ async def chat_stream(
                 question=question,
                 draft_answer=answer_text,
             )
-            yield _sse_event(
-                "approval_required", {"approval_id": approval_id}
-            )
+            yield _sse_event("approval_required", {"approval_id": approval_id})
         else:
             yield _sse_event("done", {"answer": answer_text})
 

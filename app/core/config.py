@@ -44,7 +44,9 @@ class Settings(BaseSettings):
 
     # ── Embeddings ────────────────────────────────────────────────
     embedding_model: str = "BAAI/bge-small-en-v1.5"
-    embedding_provider: str = "sentence-transformers"  # "sentence-transformers" | "openai" | "gemini"
+    embedding_provider: str = (
+        "sentence-transformers"  # "sentence-transformers" | "openai" | "gemini"
+    )
     openai_api_key: str = ""
     openai_embedding_model: str = "text-embedding-3-small"
     embedding_dimension: int = 384  # 384 for BGE-small, 1536 for OpenAI, 768 for Gemini

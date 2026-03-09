@@ -111,9 +111,7 @@ async def _judge_ollama(question: str, contexts: list[str]) -> dict[str, Any]:
         "stream": False,
     }
     async with httpx.AsyncClient(timeout=settings.ollama_timeout_seconds) as client:
-        resp = await client.post(
-            f"{settings.ollama_base_url}/api/generate", json=payload
-        )
+        resp = await client.post(f"{settings.ollama_base_url}/api/generate", json=payload)
         resp.raise_for_status()
         data = resp.json()
         raw = data.get("response", "")

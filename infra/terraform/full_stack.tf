@@ -447,8 +447,8 @@ resource "aws_ecs_task_definition" "api" {
     name = "uploads"
 
     efs_volume_configuration {
-      file_system_id          = aws_efs_file_system.qdrant.id
-      transit_encryption      = "ENABLED"
+      file_system_id     = aws_efs_file_system.qdrant.id
+      transit_encryption = "ENABLED"
       authorization_config {
         access_point_id = aws_efs_access_point.uploads.id
         iam             = "ENABLED"
@@ -535,8 +535,8 @@ resource "aws_ecs_task_definition" "worker" {
     name = "uploads"
 
     efs_volume_configuration {
-      file_system_id          = aws_efs_file_system.qdrant.id
-      transit_encryption      = "ENABLED"
+      file_system_id     = aws_efs_file_system.qdrant.id
+      transit_encryption = "ENABLED"
       authorization_config {
         access_point_id = aws_efs_access_point.uploads.id
         iam             = "ENABLED"
@@ -664,8 +664,8 @@ resource "aws_ecs_task_definition" "qdrant" {
     name = "qdrant-storage"
 
     efs_volume_configuration {
-      file_system_id          = aws_efs_file_system.qdrant.id
-      transit_encryption      = "ENABLED"
+      file_system_id     = aws_efs_file_system.qdrant.id
+      transit_encryption = "ENABLED"
       authorization_config {
         access_point_id = aws_efs_access_point.qdrant.id
         iam             = "ENABLED"

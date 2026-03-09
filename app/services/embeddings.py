@@ -135,6 +135,7 @@ def get_embedder() -> EmbeddingProvider:
 def embed_texts(texts: List[str]) -> List[List[float]]:
     """Embed a list of texts using the configured provider."""
     import time
+
     from app.core.metrics import EMBEDDING_DURATION, EMBEDDING_TEXTS_PROCESSED
 
     provider = settings.embedding_provider

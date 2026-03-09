@@ -15,7 +15,12 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.deps import require_roles
-from app.models.schemas import TenantCreateRequest, TenantPolicyResponse, TenantPolicyUpdateRequest, TenantResponse
+from app.models.schemas import (
+    TenantCreateRequest,
+    TenantPolicyResponse,
+    TenantPolicyUpdateRequest,
+    TenantResponse,
+)
 from app.services.approval_policy import get_tenant_approval_mode, set_tenant_approval_mode
 from app.services.audit import log_event
 from app.services.users import create_tenant_account, get_tenant_account, list_tenant_accounts
@@ -58,7 +63,10 @@ def create_tenant(payload: TenantCreateRequest, user: dict = Depends(require_rol
 def list_tenants(_current_user: dict = Depends(require_roles(["admin"]))):
     """List all tenants in the system. Only admins can see this list."""
     rows = list_tenant_accounts()
-    return [TenantResponse(tenant_id=row.tenant_id, name=row.name, created_at=row.created_at) for row in rows]
+    return [
+        TenantResponse(tenant_id=row.tenant_id, name=row.name, created_at=row.created_at)
+        for row in rows
+    ]
 
 
 @router.get("/{tenant_id}/policy", response_model=TenantPolicyResponse)
@@ -76,6 +84,7 @@ def get_policy(
     If no policy has been explicitly set, the system default is returned.
     """
     from app.db.audit_db import get_tenant_policy
+
     policy = get_tenant_policy(tenant_id)
     if policy:
         return TenantPolicyResponse(

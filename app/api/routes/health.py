@@ -23,9 +23,9 @@ from sqlalchemy import text
 from app.core.config import settings
 from app.core.metrics import HEALTH_CHECK_STATUS
 from app.db.session import SessionLocal
-from app.services.retrieval import get_qdrant_client
 from app.services.llm import ollama_health
 from app.services.queue import get_redis_connection
+from app.services.retrieval import get_qdrant_client
 
 router = APIRouter(prefix="/health", tags=["health"])
 
@@ -61,7 +61,10 @@ def ready_check():
         t0 = time.perf_counter()
         with SessionLocal() as db:
             db.execute(text("SELECT 1"))
-        checks["database"] = {"status": True, "latency_ms": round((time.perf_counter() - t0) * 1000, 1)}
+        checks["database"] = {
+            "status": True,
+            "latency_ms": round((time.perf_counter() - t0) * 1000, 1),
+        }
     except Exception as exc:
         checks["database"] = {"status": False, "error": str(exc)[:100]}
 
@@ -87,7 +90,10 @@ def ready_check():
         t0 = time.perf_counter()
         redis_conn = get_redis_connection()
         redis_conn.ping()
-        checks["redis"] = {"status": True, "latency_ms": round((time.perf_counter() - t0) * 1000, 1)}
+        checks["redis"] = {
+            "status": True,
+            "latency_ms": round((time.perf_counter() - t0) * 1000, 1),
+        }
     except Exception as exc:
         checks["redis"] = {"status": False, "error": str(exc)[:100]}
 

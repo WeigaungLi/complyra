@@ -32,10 +32,9 @@ from typing import List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
+from langsmith import traceable
 from qdrant_client import QdrantClient
 from qdrant_client.http import models as qmodels
-
-from langsmith import traceable
 
 from app.core.config import settings
 from app.services.embeddings import embed_texts, get_embedder
@@ -92,7 +91,9 @@ def ensure_collection() -> None:
         vectors = info.config.params.vectors
         # Handle both named vectors (dict) and flat VectorParams
         if isinstance(vectors, dict):
-            existing_dim = vectors.get("dense", qmodels.VectorParams(size=0, distance=qmodels.Distance.COSINE)).size
+            existing_dim = vectors.get(
+                "dense", qmodels.VectorParams(size=0, distance=qmodels.Distance.COSINE)
+            ).size
         else:
             existing_dim = vectors.size
         # Dimension mismatch warning: if the collection was created with a
@@ -113,20 +114,14 @@ def ensure_collection() -> None:
             client.create_collection(
                 collection_name=settings.qdrant_collection,
                 vectors_config={
-                    "dense": qmodels.VectorParams(
-                        size=dim, distance=qmodels.Distance.COSINE
-                    )
+                    "dense": qmodels.VectorParams(size=dim, distance=qmodels.Distance.COSINE)
                 },
-                sparse_vectors_config={
-                    "sparse": qmodels.SparseVectorParams()
-                },
+                sparse_vectors_config={"sparse": qmodels.SparseVectorParams()},
             )
         else:
             client.create_collection(
                 collection_name=settings.qdrant_collection,
-                vectors_config=qmodels.VectorParams(
-                    size=dim, distance=qmodels.Distance.COSINE
-                ),
+                vectors_config=qmodels.VectorParams(size=dim, distance=qmodels.Distance.COSINE),
             )
 
 
@@ -163,6 +158,7 @@ def upsert_chunks(
     sparse_vectors = None
     if use_sparse:
         from app.services.sparse_embed import compute_sparse_vectors
+
         sparse_vectors = compute_sparse_vectors(chunks)
 
     # Determine if collection uses named vectors
@@ -297,7 +293,9 @@ def delete_document(document_id: str, tenant_id: str) -> int:
 
 
 @traceable(name="search_chunks", run_type="retriever")
-def search_chunks(query: str, top_k: int, tenant_id: str) -> List[Tuple[str, float, str, List[int], str]]:
+def search_chunks(
+    query: str, top_k: int, tenant_id: str
+) -> List[Tuple[str, float, str, List[int], str]]:
     """Search for similar chunks in Qdrant.
 
     When hybrid search is enabled and the collection supports sparse vectors,
@@ -307,6 +305,7 @@ def search_chunks(query: str, top_k: int, tenant_id: str) -> List[Tuple[str, flo
     Returns a list of tuples: (text, score, source, page_numbers).
     """
     import time
+
     from app.core.metrics import RETRIEVAL_DURATION, RETRIEVAL_RESULTS_COUNT
 
     search_start = time.perf_counter()
@@ -334,6 +333,7 @@ def search_chunks(query: str, top_k: int, tenant_id: str) -> List[Tuple[str, flo
         # documents with similar meaning even if they use different words;
         # sparse search finds documents that share exact keywords with the query.
         from app.services.sparse_embed import compute_sparse_vectors
+
         sparse_vector = compute_sparse_vectors([query])[0]
 
         # Qdrant's "prefetch" mechanism runs both searches independently,
@@ -384,20 +384,20 @@ def search_chunks(query: str, top_k: int, tenant_id: str) -> List[Tuple[str, flo
             )
 
     search_type = "hybrid" if use_hybrid else "dense"
-    RETRIEVAL_DURATION.labels(search_type=search_type).observe(
-        time.perf_counter() - search_start
-    )
+    RETRIEVAL_DURATION.labels(search_type=search_type).observe(time.perf_counter() - search_start)
 
     matches: List[Tuple[str, float, str, List[int], str]] = []
     for res in results.points:
         payload = res.payload or {}
-        matches.append((
-            payload.get("text", ""),
-            res.score,
-            payload.get("source", ""),
-            payload.get("page_numbers", []),
-            payload.get("document_id", ""),
-        ))
+        matches.append(
+            (
+                payload.get("text", ""),
+                res.score,
+                payload.get("source", ""),
+                payload.get("page_numbers", []),
+                payload.get("document_id", ""),
+            )
+        )
 
     RETRIEVAL_RESULTS_COUNT.observe(len(matches))
     return matches

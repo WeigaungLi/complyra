@@ -7,12 +7,14 @@ from pathlib import Path
 from typing import Optional
 
 from app.db.audit_db import (
-    create_document_record as _create_doc,
+    bulk_update_documents_db,
+)
+from app.db.audit_db import create_document_record as _create_doc
+from app.db.audit_db import (
     get_document,
+    get_documents_by_ids,
     list_documents_db,
     update_document_db,
-    bulk_update_documents_db,
-    get_documents_by_ids,
 )
 from app.db.models import Document
 from app.services.retrieval import delete_document as delete_qdrant_doc
@@ -78,7 +80,9 @@ def update_sensitivity(document_id: str, tenant_id: str, sensitivity: str) -> Op
     return update_document_db(document_id=document_id, sensitivity=sensitivity)
 
 
-def update_approval_override(document_id: str, tenant_id: str, override: Optional[str]) -> Optional[Document]:
+def update_approval_override(
+    document_id: str, tenant_id: str, override: Optional[str]
+) -> Optional[Document]:
     doc = get_document(document_id)
     if not doc or doc.tenant_id != tenant_id:
         return None

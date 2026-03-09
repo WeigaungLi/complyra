@@ -77,7 +77,9 @@ async def ingest_file(
     max_size_bytes = settings.ingest_max_file_size_mb * 1024 * 1024
     data = await file.read(max_size_bytes + 1)
     if len(data) > max_size_bytes:
-        raise HTTPException(status_code=413, detail=f"File exceeds {settings.ingest_max_file_size_mb} MB limit")
+        raise HTTPException(
+            status_code=413, detail=f"File exceeds {settings.ingest_max_file_size_mb} MB limit"
+        )
 
     # --- Save file to disk ---
     # We prefix the filename with the job_id to avoid name collisions.
@@ -88,7 +90,9 @@ async def ingest_file(
     local_path.write_bytes(data)
 
     # Create a job record in the database so we can track its status.
-    create_ingest_job(job_id=job_id, tenant_id=tenant_id, created_by=user["user_id"], filename=normalized_filename)
+    create_ingest_job(
+        job_id=job_id, tenant_id=tenant_id, created_by=user["user_id"], filename=normalized_filename
+    )
 
     # --- Sync vs Async ingestion path ---
     # When async is enabled (production), the job is placed onto a Redis queue

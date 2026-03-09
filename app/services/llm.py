@@ -23,7 +23,10 @@ logger = logging.getLogger(__name__)
 def _build_prompt(question: str, contexts: List[str], sources: List[str] | None = None) -> str:
     """Build the LLM prompt with context, source citations, and prompt-injection guardrails."""
     if sources and len(sources) == len(contexts):
-        numbered = [f"[{i+1}] (Source: {src})\n{text}" for i, (text, src) in enumerate(zip(contexts, sources))]
+        numbered = [
+            f"[{i+1}] (Source: {src})\n{text}"
+            for i, (text, src) in enumerate(zip(contexts, sources))
+        ]
     else:
         numbered = [f"[{i+1}]\n{text}" for i, text in enumerate(contexts)]
     context_block = "\n\n".join(numbered)
@@ -42,6 +45,7 @@ def _build_prompt(question: str, contexts: List[str], sources: List[str] | None 
 
 def _openai_client():
     from openai import OpenAI
+
     return OpenAI(api_key=settings.openai_api_key)
 
 
@@ -84,9 +88,7 @@ def _generate_ollama(question: str, contexts: List[str], sources: List[str] | No
         "stream": False,
     }
     with httpx.Client(timeout=settings.ollama_timeout_seconds) as client:
-        response = client.post(
-            f"{settings.ollama_base_url}/api/generate", json=payload
-        )
+        response = client.post(f"{settings.ollama_base_url}/api/generate", json=payload)
         response.raise_for_status()
         data = response.json()
         return data.get("response", "").strip()
@@ -154,11 +156,7 @@ async def _generate_gemini_stream(
             async for line in resp.aiter_lines():
                 if line.startswith("data: "):
                     data = json.loads(line[6:])
-                    parts = (
-                        data.get("candidates", [{}])[0]
-                        .get("content", {})
-                        .get("parts", [])
-                    )
+                    parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
                     for part in parts:
                         text = part.get("text", "")
                         if text:
@@ -171,6 +169,7 @@ async def _generate_gemini_stream(
 def describe_image(image_bytes: bytes) -> str:
     """Describe image content using Gemini's multimodal API."""
     import time
+
     from app.core.metrics import LLM_CALL_DURATION, LLM_CALL_ERRORS
 
     if not settings.gemini_api_key:
@@ -229,6 +228,7 @@ def describe_image(image_bytes: bytes) -> str:
 def generate_answer(question: str, contexts: List[str], sources: List[str] | None = None) -> str:
     """Generate a complete answer synchronously."""
     import time
+
     from app.core.metrics import LLM_CALL_DURATION, LLM_CALL_ERRORS
 
     provider = settings.llm_provider
@@ -254,6 +254,7 @@ async def generate_answer_stream(
 ) -> AsyncIterator[str]:
     """Yield token chunks from the configured LLM provider."""
     import time
+
     from app.core.metrics import LLM_CALL_DURATION, LLM_CALL_ERRORS, LLM_TOKENS_GENERATED
 
     provider = settings.llm_provider

@@ -1,0 +1,4 @@
+Unicode test: café, naïve, résumé
+Chinese: 测试文档
+Japanese: テスト文書
+Emoji: ✅ ❌ ⚠️

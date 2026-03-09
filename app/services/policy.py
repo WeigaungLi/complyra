@@ -16,6 +16,7 @@ from app.core.config import settings
 @dataclass(frozen=True)
 class PolicyEvaluation:
     """Result of evaluating an answer against output policies."""
+
     blocked: bool
     matched_rules: list[str]
     answer: str

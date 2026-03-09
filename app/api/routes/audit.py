@@ -139,7 +139,9 @@ def export_audit(
 
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["id", "timestamp", "tenant_id", "user", "action", "input_text", "output_text", "metadata"])
+    writer.writerow(
+        ["id", "timestamp", "tenant_id", "user", "action", "input_text", "output_text", "metadata"]
+    )
     for row in rows:
         writer.writerow(
             [

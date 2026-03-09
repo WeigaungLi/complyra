@@ -68,7 +68,11 @@ def get_documents(
     """List documents with filtering and pagination."""
     effective_status = None if status == "all" else status
     docs, total = list_tenant_documents(
-        tenant_id, status=effective_status, sensitivity=sensitivity, limit=limit, offset=offset,
+        tenant_id,
+        status=effective_status,
+        sensitivity=sensitivity,
+        limit=limit,
+        offset=offset,
     )
     return DocumentListResponse(items=[_doc_to_response(d) for d in docs], total=total)
 
@@ -81,7 +85,9 @@ def get_documents_legacy(
     """Legacy endpoint: list documents from Qdrant (for backward compatibility)."""
     docs = list_documents(tenant_id)
     return [
-        DocumentInfo(document_id=d["document_id"], filename=d["source"], chunk_count=d["chunk_count"])
+        DocumentInfo(
+            document_id=d["document_id"], filename=d["source"], chunk_count=d["chunk_count"]
+        )
         for d in docs
     ]
 
@@ -155,6 +161,7 @@ def remove_document(
 
     # Soft-delete in SQL
     from app.db.audit_db import update_document_db
+
     update_document_db(document_id=document_id, status="deleted")
 
     # Remove from Qdrant
@@ -182,7 +189,9 @@ def bulk_operation(
         count = bulk_delete_documents(payload.document_ids, tenant_id)
     elif payload.action == "update_sensitivity":
         if not payload.sensitivity:
-            raise HTTPException(status_code=400, detail="sensitivity is required for update_sensitivity action")
+            raise HTTPException(
+                status_code=400, detail="sensitivity is required for update_sensitivity action"
+            )
         count = bulk_update_sensitivity(payload.document_ids, tenant_id, payload.sensitivity)
     else:
         raise HTTPException(status_code=400, detail=f"Unknown action: {payload.action}")

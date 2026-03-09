@@ -73,9 +73,7 @@ async def _rewrite_ollama(query: str) -> str:
         "stream": False,
     }
     async with httpx.AsyncClient(timeout=settings.ollama_timeout_seconds) as client:
-        resp = await client.post(
-            f"{settings.ollama_base_url}/api/generate", json=payload
-        )
+        resp = await client.post(f"{settings.ollama_base_url}/api/generate", json=payload)
         resp.raise_for_status()
         data = resp.json()
         return data.get("response", "").strip()

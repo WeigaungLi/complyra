@@ -103,9 +103,9 @@ class LogBuffer:
         if search:
             search_lower = search.lower()
             entries = [
-                e for e in entries
-                if search_lower in e.message.lower()
-                or search_lower in e.logger.lower()
+                e
+                for e in entries
+                if search_lower in e.message.lower() or search_lower in e.logger.lower()
             ]
 
         # Return most recent first
